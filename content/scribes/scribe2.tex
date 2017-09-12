@@ -1,0 +1,310 @@
+\documentclass[11pt]{article}
+\usepackage{latexsym}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[right=0.8in, top=1in, bottom=1.2in, left=0.8in]{geometry}
+
+\usepackage{bm}
+\usepackage{caption}
+\usepackage{algorithm} 
+\usepackage[noend]{algpseudocode}
+\usepackage[colorlinks=true,linkcolor=blue]{hyperref}
+
+% Title
+\newcommand{\handout}[5]{
+  \noindent
+  \begin{center}
+  \framebox{
+    \vbox{\vspace{0.25cm}
+      \hbox to 5.78in { {COMS W6998-5:\hspace{0.12cm}Algorithms
+      		through Geometric Lens (Fall'17)} \hfill #2 }
+      \vspace{0.48cm}
+      \hbox to 5.78in { {\Large \hfill #5  \hfill} }
+      \vspace{0.42cm}
+      \hbox to 5.78in { {#3 \hfill #4} }\vspace{0.25cm}
+    }
+  }
+  \end{center}
+  \vspace*{4mm}
+}
+\newcommand{\lecture}[4]{\handout{#1}{#2}{#3}{Scribe:\hspace{0.08cm}#4}{Lecture #1}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{claim}{Claim}
+\newtheorem{example}{Example}
+\newtheorem{corollary}{Corollary}
+
+\newtheorem*{theorem*}{Theorem}
+\newtheorem*{lemma*}{Lemma}
+\newtheorem*{definition*}{Definition}
+\newtheorem*{proposition*}{Proposition}
+\newtheorem*{claim*}{Claim}
+\newtheorem*{example*}{Example}
+\newtheorem*{corollary*}{Corollary}
+
+\newcommand{\Expect}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\renewcommand{\vec}[1]{\bm{#1}}
+\newcommand{\abs}[1]{\left| #1 \right|}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
+\algnewcommand\algorithmicinput{\textbf{Input:}}
+\algnewcommand\Input{\item[\algorithmicinput]}
+\algnewcommand\algorithmicoutput{\textbf{Output:}}
+\algnewcommand\Output{\item[\algorithmicoutput]}
+\algnewcommand{\algorithmicouts}{\textbf{output }}
+\algnewcommand{\OutputS}{\State \algorithmicouts}
+\renewcommand{\algorithmicforall}{\textbf{upon seeing}}
+
+\allowdisplaybreaks
+
+\makeatletter
+\renewcommand*{\eqref}[1]{%
+	\hyperref[{#1}]{\textup{\tagform@{\ref*{#1}}}}%
+}
+\makeatother
+
+\begin{document}
+
+\lecture{2 -- Estimating Frequency Moments and Heavy Hitters}{9 September, 2017}{Instructors:\hspace{0.08cm}\emph{Alex Andoni, Ilya Razenshteyn}}{\emph{Nishanth Mohan}}
+
+\section{Introduction}
+Last time, we introduced the \mbox{\sc TugOfWar} algorithm of Alon \textit{et al.} \cite{alon1996space} to estimate the second frequency moment of a stream. This time, we finish its analysis, describe and analyze an improved version of it (called \mbox{\sc TugOfWar++}), and introduce the heavy hitters problem.
+
+\section{Estimating Second Frequency Moments}
+As in the previous lecture, assume we have a stream $e = (e_1, e_2 \dots e_m)$ of length $m$ each element of which is from the universe $[n] = \{1, 2, \dots n\}$. Given the frequency vector $\vec{X} = (X_1, X_2 \dots X_n)^T$ where $X_i$ is the frequency of $i \in [n]$, we want to estimate its second moment $F_2$ defined as 
+\[
+F_2 = \sum_{i=1}^{n} X_i^2
+\]
+
+\noindent To do this, we introduced the \mbox{\sc TugOfWar} algorithm which is as follows:
+\begin{algorithm}[H]
+	\caption*{\textbf{Algorithm 1:} \mbox{\sc TugOfWar}}
+	\begin{algorithmic}[1]
+		\Input  Stream $e = (e_1, e_2 \dots e_m)$ where each $e_j \in [n]$
+		\Output Estimate $\hat{a}$ of $F_2 = \sum_{i=1}^{n} X_i^2$
+		\State Generate $n$ independent Rademacher random samples $r_1, r_2 \dots r_n \in \{-1, +1\}$ 
+		\State $Z \gets 0$
+		\ForAll{$e_j \in [n]$}
+			\State $Z \gets Z + r_{e_j}$
+		\EndFor
+		\OutputS $\hat{a} = Z^2$
+	\end{algorithmic}
+\end{algorithm}
+\noindent Note that 
+\[	
+	Z = \sum_{i=1}^{n} X_i \cdot r_i
+\]
+
+\subsection*{\underline{Analysis}}
+\begin{claim}
+	$\Expect[Z] = 0$
+\end{claim}
+\begin{proof}
+We have
+\begin{align*}
+\Expect[Z] &= \Expect \left[\sum_{i=1}^{n} X_i \cdot r_i \right] \\[3pt]
+\Rightarrow \Expect[Z] &= \sum_{i=1}^{n} \Expect [X_i \cdot r_i] & \textrm{\dots (by the linearity of expectation)} \\[3pt]
+&= \sum_{i=1}^{n} X_i \cdot \Expect[r_i] & \textrm{\dots ($X_i$ is constant with respect to $r_i$)} \\[3pt]
+&= 0
+\end{align*}
+\end{proof}
+
+\begin{claim} \label{claim2}
+	$\Expect[Z^2] = F_2$
+\end{claim}
+\begin{proof}
+We have
+\begin{align*}
+\Expect[Z^2] &= \Expect \left[ \left(\sum_{i=1}^{n} X_i \cdot r_i\right)^2\right] \\[4pt]
+&= \left(\sum_{i=1}^{n} X_i^2 \cdot \underbrace{\Expect[r_i^2]}_{=1}\right) + \left(\sum_{i \neq j} X_i X_j \cdot \underbrace{\Expect[r_ir_j]}_{=0}\right) \\[4pt]
+&= \sum_{i=1}^{n} X_i^2 \\[3pt]
+&= F_2
+\end{align*}
+\noindent so $\hat{a} = Z^2$ is an unbiased estimator of $F_2$\\.
+\end{proof}
+
+\begin{claim} \label{claim3}
+	$\Var [\hat{a}] \leq 4F_2^2$
+\end{claim}
+\begin{proof}
+We have
+\begin{align}
+\Var[\hat{a}] &= \Expect[Z^4] - \Expect[Z^2]^2 \nonumber \\ 
+&\leq \Expect[Z^4] \label{eq1} \\
+&= \Expect \left[ \left( \sum_{i=1}^{n}  X_i \cdot r_i \right)^4 \right] \nonumber \\[4pt]
+&= \Expect \left( \sum_{i, j, k, \ell} X_i X_j X_k X_\ell \cdot \Expect [r_ir_jr_kr_\ell] \right) \nonumber \\[4pt]
+&= \left(\sum_i X_i^4 \cdot \underbrace{\Expect[r_i^4]}_{=1}\right) + 3 \left( \sum_{i \neq j} X_i^2 X_j^2 \cdot \underbrace{\Expect[r_i^2 r_j^2]}_{=1} \right) \label{eq2} \\[4pt]
+&= \left(\sum_i X_i^4 \right) + 3 \left(\sum_{i \neq j} X_i^2 X_j^2\right) \nonumber \\
+\Rightarrow \Var[\hat{a}] &\leq 4 \left(\sum_{i=1}^{n} X_i^2\right)^2 \label{eq3} \\[4pt]
+&= 4F_2^2 & \textrm{\dots (from \hyperref[claim2]{Claim 2})} \nonumber \\
+\nonumber
+\end{align}
+
+\noindent \eqref{eq1} follows since $\Expect[Z^4] \geq \Expect[Z^2]^2$ by Jensen's inequality and $\Expect[Z^2]^2 \geq 0$. \\ \\
+\noindent \eqref{eq2} follows since: 
+\begin{itemize}
+	\item Expectation terms with odd powers of $r_i$ evaluate to $0$.
+	\item There are $\frac{1}{2} \binom{4}{2} = 3$ terms of the form $\Expect[r_i^2 r_j^2]$
+\end{itemize}
+\noindent \eqref{eq3} holds since 
+\begin{align*}
+\left(\sum_{i=1}^{n} X_i\right)^2 &= \left(\sum_{i=1}^{n} X_i^2 \right) + \left(\sum_{i \neq j} X_i X_j \right) \\[3pt]
+&\geq \max \left\{ \sum_{i=1}^{n} X_i^2 \;\; , \;\; \sum_{i \neq j} X_i X_j \right\}
+\end{align*}
+\end{proof}
+
+\noindent Finally, combining \hyperref[claim3]{Claim 3} and Chebyshev's inequality yields
+\[
+	\Pr \left[ \abs{\hat{a} - F_2} \geq 7F_2 \right] \leq \frac{\Var(Z^2)}{(7F_2)^2} = \frac{4}{49} \leq 0.1
+\]
+so we have $0 \leq \hat{a} \leq 8F_2$ with probability at least $0.9$. \\ \\
+
+\noindent \textbf{Space Requirement:} Storing our sketch requires $O(\log n)$ space. Moreover, for the $r_i$'s, it turns out we only need a $4$-wise independent hash function $h : [n] \to \{-1, +1\}$ ($4$-wise independent since we assume the independence of at most every distinct quartet $(r_i, r_j, r_k, r_\ell)$ to arrive at \eqref{eq2}) which can be implemented with $O(\log n)$ bits, so we need $O(\log n)$ bits in total. 
+
+\section{Improved Second Frequency Moment Estimator}
+While the \mbox{\sc TugOfWar} algorithm only takes $O(\log n)$ space, its variance is too high, so we use a standard averaging trick to reduce its variance while keeping the space requirements relatively low. This improved algorithm, \mbox{\sc TugOfWar++}, is as follows:
+\begin{algorithm}[H]
+	\caption*{\textbf{Algorithm 2:} \mbox{\sc TugOfWar++}}
+	\begin{algorithmic}[1]
+		\Input  Stream $e = (e_1, e_2 \dots e_m)$ where each $e_j \in [n]$, $k \in \mathbb{Z}_+$
+		\Output Estimate $\tilde{a}$ of $F_2 = \sum_{i=1}^{n} X_i^2$
+		\For{$i = 1, 2 \dots k$}
+		\State $Z_k \gets$ \mbox{\sc TugOfWar}($e$)
+		\EndFor
+		\OutputS $\tilde{a} = \frac{1}{k} \sum_{i=1}^{k}Z_k$
+	\end{algorithmic}
+\end{algorithm}
+
+\newpage
+
+\subsection*{\underline{Analysis}}
+
+\begin{claim}
+	$\Expect[\tilde{a}] = F_2$
+\end{claim}
+\begin{proof}
+We have
+\begin{align*}
+\Expect[\tilde{a}] &= \Expect \left[\frac{1}{k} \left(\sum_{i=1}^{k}Z_k \right)\right] \\[3pt]
+&= \frac{1}{k} \left(\sum_{i=1}^{k} \Expect[Z_k]\right) & \textrm{\dots (by the linearity of expectation)} \\[3pt]
+&= F_2 & \textrm{\dots (from \hyperref[claim2]{Claim 2})}
+\end{align*}
+so $\tilde{a}$ is an unbiased estimator of $F_2$.	\\
+\end{proof}
+
+\begin{claim} \label{claim5}
+	$\Var[\tilde{a}] \leq 4 F_2^2 / k$
+\end{claim}
+\begin{proof}
+We have
+\begin{align*}
+\Var[\tilde{a}] &= \Var \left[ \frac{1}{k} \left(\sum_{i=1}^{k}Z_k \right) \right] \\[4pt]
+&= \frac{1}{k^2} \left( \sum_{i=1}^{k} \Var[Z_k]\right)  & \textrm{\dots (by the linearity of variance for uncorrelated variables)} \\[4pt]
+&= \frac{k \cdot \Var[Z_k]}{k^2} \\[3pt]
+&\leq \frac{4F_2^2}{k} & \textrm{\dots (from \hyperref[claim3]{Claim 3})}
+\end{align*}
+\end{proof}
+
+\noindent Finally, combining \hyperref[claim5]{Claim 5} and Chebyshev's inequality, for $k = 49 / \epsilon^2$, yields
+\[
+	\Pr \left[ \abs{\tilde{a} - F_2} \geq \epsilon F_2 \right] \leq 0.1
+\]
+so we have a $(1 + 2\epsilon)$-estimator for $F_2$ for $\epsilon < 1/2$ since
+\[
+\frac{1+\epsilon}{1-\epsilon} \leq 1 + 2\epsilon
+\]
+for $0  \leq \epsilon \leq 1/2$. \\ 
+
+\noindent \textbf{Space Requirement:} We have to maintain $k = O(1/\epsilon^2)$ estimates of $F_2$, so we need $O(\log n / \epsilon^2)$ space for the sketch in total. \\
+
+\noindent \textbf{Note:} When viewed in matrix notation, \mbox{\sc TugOfWar++} estimates the $\ell_2$-norm squared $\norm{\vec{Z}}_2^2$ of the vector 
+\[
+	\vec{Z} = \vec{R} \cdot \vec{X}
+\] 
+where $\vec{X}$ is the vector of frequencies as defined before and $\vec{R}$ is the matrix
+\[
+	\vec{R} = \frac{1}{\sqrt{k}} \begin{bmatrix}
+	r_{11} & \cdots & r_{1j} &  \cdots & r_{1n} \\
+	\vdots & \ddots & \vdots & \ddots & \vdots \\
+	r_{i1} & \cdots & r_{ij} & \cdots & r_{in} \\
+	\vdots & \ddots & \vdots & \ddots & \vdots \\
+	r_{k1} & \cdots & r_{kj} & \cdots & r_{kn}
+	\end{bmatrix}
+\]
+wherein $r_{ij}$ denotes the $j^{th}$ independent Rademacher random sample in the $i^{th}$ run of the $\mbox{\sc TugOfWar}$ algorithm. Note that we only use $k = O(1/\epsilon^2)$ instead of $n$ rows for our estimator and $\vec{Z} \in \mathbb{R}^k$, so this a form of dimension reduction which we will explore more formally in a later lecture.
+
+\section{Application - Difference Traffic}
+Consider a situation similar to before where we have the universe $[n]$ and a network (like a transportation or traffic network for instance) with distinct entry and exit points. The entry point sees a stream with frequency vector $\vec{Y} = (Y_1, Y_2 \dots Y_n)^T$ while the exit point sees a stream with frequency vector $\vec{X} = (X_1, X_2 \dots X_n)^T$. We want to estimate the difference traffic $\mathrm{dt}(\vec{X}, \vec{Y})$ between the two streams defined as
+\[
+	\mathrm{dt}(\vec{X}, \vec{Y}) = \norm{\vec{X} - \vec{Y}}_2^2 = \sum_{i=1}^{n} (X_i - Y_i)^2
+\]
+\noindent Note that this is just the second moment of the vector $\vec{C} = \vec{X} - \vec{Y}$. \\
+
+\noindent We can use the framework developed in the previous section for this as follows: for $\vec{Y}$, we compute the sketch $f(\vec{Y}) = \vec{R} \cdot \vec{Y}$. Similarly, for $\vec{X}$, we compute the sketch $f(\vec{X}) = \vec{R} \cdot \vec{X}$ with the \textit{same} random matrix $\vec{R}$. We finally compute our estimate $g(\vec{X}, \vec{Y})$ of the difference traffic as 
+\[
+	g(\vec{X}, \vec{Y}) = \norm{f(\vec{X}) - f(\vec{Y})}_2^2 = \norm{\vec{R}\cdot(\vec{X} - \vec{Y})}_2^2 = \norm{f(\vec{C})}_2^2
+\]
+
+\noindent so $g(\vec{X}, \vec{Y})$ is indeed an estimator of the second moment of $\vec{C}$. \\
+
+\noindent This general property of $f(\alpha\vec{X} + \beta \vec{Y}) = \alpha f(\vec{X}) + \beta f(\vec{Y})$ wherein $f(\cdot)$ is a sketch of its argument and $\alpha, \beta \in \mathbb{R}$ are real numbers is know as \textit{linearity} and is applicable to a wide variety of situations (essentially those wherein $f(\cdot)$ is a linear sketch). \\
+
+\section{Heavy Hitters}
+In the previous sections, we developed algorithms to estimate the second frequency moment of a stream. This, however, is a global property of the stream and doesn't tell us much about the individual frequencies of the elements in it. A more interesting problem towards this end is to find the element with the highest frequency. It turns out, however, that this is a hard problem: in general, we need $\Omega(n)$ space to find the most frequent element (more specifically, a result in \cite{alon1996space} shows that any randomized algorithm estimating $\norm{\vec{X}}_\infty$ for $m \geq 2n$ to within a multiplicative factor of $1/3$ with probability $\epsilon <1/2$ requires $\Omega(n)$ space). \\
+
+\noindent We thus try to solve a more modest problem wherein we try to find  elements which appear ``sufficiently'' frequently in the stream. Such elements are known as a heavy hitters. \\
+
+\begin{definition}
+	\emph{\textbf{($\bm{\phi}$-Heavy Hitter)}}
+	An element $i \in [n]$ is a $\phi$-heavy hitter if $X_i \geq \phi \left(\sum_{j \leq n} X_j\right) = m \phi$ for $\phi \in (0, 1)$.
+\end{definition}
+
+\subsection{Identifying Heavy Hitters}
+At a first pass towards an algorithm to identify heavy hitters, consider a universal hash function $h : [n] \to [w]$ where $w = O(1 / \phi)$. Each element $i \in [n]$ is mapped to the bucket $h(i) \in [w]$. As before, we associate an independent Rademacher random sample $r_i \in \{-1, +1\}$ with each $i$. Now, define
+\[
+	S(j) = \sum_{i : h(i) = j}X_i \cdot r_i
+\]
+
+\noindent To see whether $i \in [n]$ is a $\phi$-heavy hitter, we look at the quantity $S(h(i))$ and output $i$ only if $\abs{S(h(i))} \geq m \phi$. More concretely, the algorithm is as follows:
+\begin{algorithm}[H]
+	\caption*{\textbf{Algorithm 3:} \mbox{\sc IdentifyByHash}}
+	\begin{algorithmic}[1]
+		\Input  Stream $e = (e_1, e_2 \dots e_m)$ where each $e_j \in [n]$, $\phi \in (0, 1)$
+		\Output $\phi$-heavy hitters in $e$ 
+		\State Generate $n$ independent Rademacher random samples $r_1, r_2 \dots r_n \in \{-1, +1\}$ 
+		\State $A[1 \dots w] \gets [0 \dots 0]$
+		\ForAll{$e_j \in [n]$}
+		\State $A[h(e_j)] \gets A[h(e_j)] + r_{e_j}$
+		\EndFor
+		\For{$i = 1, 2 \dots n$}
+			\If{$\abs{S(h(i))} \geq m \phi$}
+				\OutputS $i$
+			\EndIf
+		\EndFor
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection*{\underline{Analysis}}
+For $i \in [n]$, let $\delta(i) = S(h(i)) - X_i \cdot r_i$.
+
+\begin{claim}
+	$S(h(i))$ is an unbiased estimator of $X_i \cdot r_i$. 
+\end{claim}
+\begin{proof}
+We have
+\begin{align*}
+\Expect[\delta(i)] &= \Expect \left[\sum_{\substack{i' \neq i \\h(i') = h(i)}} X_{i'} \cdot r_{i'}\right] \\[5pt]
+&= \sum_{\substack{i' \neq i \\h(i') = h(i)}} X_{i'} \cdot \Expect[r_{i'}] \\[5pt]
+&= 0
+\end{align*}
+The claim now follows from the linearity of expectation.
+\end{proof}
+
+\newpage	
+\nocite{*}
+\bibliographystyle{alpha}
+\bibliography{scribe2ref}
+\end{document}
