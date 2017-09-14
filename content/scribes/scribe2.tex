@@ -275,9 +275,9 @@ At a first pass towards an algorithm to identify heavy hitters, consider a unive
 		\Input  Stream $e = (e_1, e_2 \dots e_m)$ where each $e_j \in [n]$, $\phi \in (0, 1)$
 		\Output $\phi$-heavy hitters in $e$ 
 		\State Generate $n$ independent Rademacher random samples $r_1, r_2 \dots r_n \in \{-1, +1\}$ 
-		\State $A[1 \dots w] \gets [0 \dots 0]$
+		\State $S[1 \dots w] \gets [0 \dots 0]$
 		\ForAll{$e_j \in [n]$}
-		\State $A[h(e_j)] \gets A[h(e_j)] + r_{e_j}$
+		\State $S[h(e_j)] \gets S[h(e_j)] + r_{e_j}$
 		\EndFor
 		\For{$i = 1, 2 \dots n$}
 			\If{$\abs{S(h(i))} \geq m \phi$}
